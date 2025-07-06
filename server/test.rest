@@ -1,0 +1,9 @@
+# POST http://localhost:8000/api/v1/payment/process-payment
+# Content-Type: application/json
+
+# {
+# "amount":200
+# }
+
+
+GET http://localhost:8000/api/v1/payment/getKey
