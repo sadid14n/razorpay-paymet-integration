@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import Razorpay from "razorpay";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import { connectDB } from "./config/db.js";
 
 dotenv.config();
 
@@ -13,6 +14,8 @@ const port = process.env.PORT || 8000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+connectDB();
 
 export const instance = new Razorpay({
   key_id: process.env.RAZORPAY_API_KEY,

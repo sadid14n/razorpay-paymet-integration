@@ -1,33 +1,41 @@
-import React, { useState } from "react";
+import React from "react";
 import { Toaster, toast } from "react-hot-toast";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const ProductPage = ({ products }) => {
+  const navigate = useNavigate();
+
   const handleBuy = async (amount) => {
     try {
+      // Step 1: Get Razorpay Key
       const { data: keyData } = await axios.get("/api/v1/payment/getKey");
-      const { data: orderData } = await axios.post(
-        "/api/v1/payment//process-payment",
-        {
-          amount,
-        }
-      );
-      const { order } = orderData;
       const { key } = keyData;
 
+      // Step 2: Create Razorpay Order
+      const { data: orderData } = await axios.post(
+        "/api/v1/payment/process-payment",
+        { amount }
+      );
+      const { order } = orderData;
+
+      if (!order || !key) {
+        return toast.error("Failed to initiate payment");
+      }
+
+      // Step 3: Razorpay Options
       const options = {
         key,
-        amount,
+        amount: order.amount,
         currency: "INR",
-        name: "Sadid Alam Pvt Ltd", //your business name
+        name: "Sadid Alam Pvt Ltd",
         description: "Test Transaction",
         image: "https://example.com/your_logo",
         order_id: order.id,
-        callback_url: "/api/v1/payment/verification-payment",
         prefill: {
-          name: "Gaurav Kumar", //your customer's name
-          email: "gaurav.kumar@example.com",
-          contact: "9000090000", //Provide the customer's phone number for better conversion rates
+          name: "Guest User",
+          email: "guest@example.com",
+          contact: "9000000000",
         },
         notes: {
           address: "Razorpay Corporate Office",
@@ -35,18 +43,53 @@ const ProductPage = ({ products }) => {
         theme: {
           color: "#3399cc",
         },
+        handler: async function (response) {
+          try {
+            const verifyRes = await axios.post(
+              "/api/v1/payment/verification-payment",
+              {
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+                amount: order.amount,
+                name: "Guest User",
+                email: "guest@example.com",
+                contact: "9000000000",
+              }
+            );
+
+            if (verifyRes.data.success) {
+              navigate(
+                `/paymentSuccess?reference=${response.razorpay_payment_id}`
+              );
+            } else {
+              toast.error("Payment verification failed");
+            }
+          } catch (error) {
+            console.error("Verification Error:", error);
+            toast.error("Server error during payment verification");
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast("Payment cancelled");
+          },
+        },
       };
-      const rzp = new Razorpay(options);
+
+      // Step 4: Open Razorpay Checkout
+      const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (error) {
-      console.log(error);
-      return toast.error("Something went wrong. Please try again later");
+      console.error("Payment Error:", error);
+      toast.error("Something went wrong. Please try again.");
     }
   };
+
   return (
     <>
+      <Toaster />
       <div className="bg-gray-300 flex flex-wrap gap-5 p-6 justify-around">
-        <Toaster />
         {products.map((product) => (
           <div
             key={product.id}
@@ -55,7 +98,7 @@ const ProductPage = ({ products }) => {
             <div className="w-[200px] h-[200px]">
               <img
                 src={product.img}
-                alt=""
+                alt={product.title}
                 className="w-full h-full object-contain"
               />
             </div>
@@ -67,7 +110,7 @@ const ProductPage = ({ products }) => {
               <div className="flex justify-between my-3 pb-3">
                 <p className="font-bold">Rs: {product.price}</p>
                 <button
-                  className="bg-green-600 px-4 py-1 rounded-md cursor-pointer"
+                  className="bg-green-600 px-4 py-1 rounded-md text-white hover:bg-green-700"
                   onClick={() => handleBuy(product.price)}
                 >
                   Buy Now
